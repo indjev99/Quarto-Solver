@@ -2,12 +2,13 @@
 #include <cassert>
 #include <string>
 #include <cctype>
+#include <vector>
 
 #define FOR_PROPS(i) for (uint16_t i = 0; i < NUM_PROPS; ++i)
 #define FOR_PROPS_VARS(i, j) for (uint16_t i = 0; i < NUM_PROPS; ++i) for (uint16_t j = 0; j < NUM_VARS; ++j) 
 #define FOR_PIECES(i) for (uint16_t i = 0; i < NUM_PIECES; ++i)
 #define FOR_CELLS(i) for (uint16_t i = 0; i < NUM_CELLS; ++i)
-#define FOR_ROWS_COLS(i, j) for (uint16_t i = 1; i <= NUM_ROWS; ++i) for (uint16_t j = 1; j <= NUM_COLS; ++j)
+#define FOR_WIN_LEN(i) for (uint16_t i = 0; i < WIN_LEN; ++i)
 
 constexpr uint16_t NUM_VARS = 2u;
 constexpr uint16_t NUM_PROPS = 4u;
@@ -18,7 +19,25 @@ constexpr uint16_t NUM_ROWS = 4;
 constexpr uint16_t NUM_COLS = 4;
 constexpr uint16_t NUM_CELLS = NUM_ROWS * NUM_COLS;
 
-static_assert(NUM_PIECES == NUM_CELLS);
+constexpr uint16_t WIN_LEN = 4;
+constexpr uint16_t WIN_SQ_SIDE = 2;
+
+static_assert(WIN_SQ_SIDE * WIN_SQ_SIDE == WIN_LEN);
+
+uint16_t rowColToCell(uint16_t row, uint16_t col)
+{
+    return row * NUM_COLS + col;
+}
+
+uint16_t cellToRow(uint16_t cell)
+{
+    return cell / NUM_ROWS;
+}
+
+uint16_t cellToCol(uint16_t cell)
+{
+    return cell % NUM_COLS;
+}
 
 uint16_t getBit(uint16_t val, uint16_t n)
 {
@@ -36,6 +55,71 @@ void clearBit(uint16_t& val, uint16_t n)
     assert(getBit(val, n));
     val &= ~(1 << n);
 }
+
+std::vector<uint16_t> computeWinMasks()
+{
+    std::vector<uint16_t> winMasks;
+
+    FOR_CELLS(i)
+    {
+        uint16_t row = cellToRow(i);
+        uint16_t col = cellToCol(i);
+
+        if (col + WIN_LEN <= NUM_COLS)
+        {
+            uint16_t winMask = 0;
+            FOR_WIN_LEN(j)
+            {
+                setBit(winMask, rowColToCell(row, col + j));
+            }
+            winMasks.push_back(winMask);
+        }
+
+        if (row + WIN_LEN <= NUM_ROWS)
+        {
+            uint16_t winMask = 0;
+            FOR_WIN_LEN(j)
+            {
+                setBit(winMask, rowColToCell(row + j, col));
+            }
+            winMasks.push_back(winMask);
+        }
+
+        if (row + WIN_LEN <= NUM_ROWS && col + WIN_LEN <= NUM_COLS)
+        {
+            uint16_t winMask = 0;
+            FOR_WIN_LEN(j)
+            {
+                setBit(winMask, rowColToCell(row + j, col + j));
+            }
+            winMasks.push_back(winMask);
+        }
+
+        if (row + WIN_LEN <= NUM_ROWS && col >= WIN_LEN - 1)
+        {
+            uint16_t winMask = 0;
+            FOR_WIN_LEN(j)
+            {
+                setBit(winMask, rowColToCell(row + j, col - j));
+            }
+            winMasks.push_back(winMask);
+        }
+
+        if (row + WIN_SQ_SIDE <= NUM_ROWS && col + WIN_SQ_SIDE <= NUM_COLS)
+        {
+            uint16_t winMask = 0;
+            FOR_WIN_LEN(j)
+            {
+                setBit(winMask, rowColToCell(row + j / WIN_SQ_SIDE, col + j % WIN_SQ_SIDE));
+            }
+            winMasks.push_back(winMask);
+        }
+    }
+
+    return winMasks;
+}
+
+const std::vector<uint16_t> winMasks = computeWinMasks();
 
 struct State
 {
@@ -112,22 +196,29 @@ struct State
 
         return piece;
     }
+
+    bool isWon()
+    {
+        assert(currPiece == NO_PIECE);
+
+        for (uint16_t winMask : winMasks)
+        {
+            FOR_PROPS_VARS(i, j)
+            {
+                if ((cellsProps[i][j] & winMask) == winMask) return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool isDone()
+    {
+        assert(currPiece == NO_PIECE);
+
+        return piecesTaken == (1 << NUM_PIECES) - 1 || cellsTaken == (1 << NUM_CELLS) - 1;
+    }
 };
-
-uint16_t rowColToCell(uint16_t row, uint16_t col)
-{
-    return (row - 1) * NUM_COLS + (col - 1);
-}
-
-uint16_t cellToRow(uint16_t cell)
-{
-    return cell / NUM_ROWS + 1;
-}
-
-uint16_t cellToCol(uint16_t cell)
-{
-    return cell % NUM_COLS + 1;
-}
 
 std::string pieceToString(uint16_t piece)
 {
@@ -138,10 +229,11 @@ std::string pieceToString(uint16_t piece)
     if (getBit(piece, 2)) first = std::toupper(first);
     if (getBit(piece, 3)) second  = std::toupper(second );
 
-    std::string pieceStr;
-    pieceStr += first;
-    pieceStr += second;
-    return pieceStr;
+    std::string str;
+    str += first;
+    str += second;
+
+    return str;
 }
 
 uint16_t stringToPiece(std::string str)
@@ -163,6 +255,36 @@ uint16_t stringToPiece(std::string str)
     return piece;
 }
 
+std::string cellToString(uint16_t cell)
+{
+    uint16_t row = cellToRow(cell);
+    uint16_t col = cellToRow(cell);
+
+    char first = 'a' + col;
+    char second = '1' + (NUM_ROWS - row - 1);
+
+    std::string str;
+    str += first;
+    str += second;
+
+    return str;
+}
+
+uint16_t stringToCell(std::string str)
+{
+    assert(str.size() == 2);
+
+    uint16_t row = NUM_ROWS - (str[1] - '1') - 1;
+    uint16_t col = str[0] - 'a';
+
+    assert(row >= 0 && row < NUM_ROWS);
+    assert(col >= 0 && col < NUM_COLS);
+
+    uint16_t cell = rowColToCell(row, col);
+
+    return cell;
+}
+
 void play()
 {
     State state;
@@ -170,40 +292,58 @@ void play()
     while (true)
     {
         std::cout << "Board:" << std::endl;
-        FOR_ROWS_COLS(i, j)
+        std::cout << "+----+----+----+----+";
+        std::cout << std::endl;
+        FOR_CELLS(i)
         {
-            std::cout << pieceToString(state.getPiece(rowColToCell(i, j)));
+            std::cout << "| ";
+            std::cout << pieceToString(state.getPiece(i));
+            std::cout << " ";
 
-            if (j < NUM_COLS) std::cout << " | ";
-            else if (i < NUM_ROWS)
+            uint16_t col = cellToCol(i);
+
+            if (col == NUM_COLS - 1)
             {
+                std::cout << "|";
                 std::cout << std::endl;
-                std::cout << "---+----+----+---";
+                std::cout << "+----+----+----+----+";
                 std::cout << std::endl;
             }
-            else std::cout << std::endl;
         }
         std::cout << std::endl;
 
         if (state.currPiece == NO_PIECE)
         {
+            if (state.isWon())
+            {
+                std::cout << "Win" << std::endl;
+                break;
+            }
+
+            if (state.isDone())
+            {
+                std::cout << "Draw" << std::endl;
+                break;
+            }
+
             std::cout << "Piece:" << std::endl;
-            std::string pieceStr;
-            std::cin >> pieceStr;
+            std::string str;
+            std::cin >> str;
             std::cout << std::endl;
-            state.moveSelect(stringToPiece(pieceStr));
-            continue;
+            state.moveSelect(stringToPiece(str));
         }
+        else
+        {
+            std::cout << "Piece:" << std::endl;
+            std::cout << pieceToString(state.currPiece) << std::endl;
+            std::cout << std::endl;
 
-        std::cout << "Piece:" << std::endl;
-        std::cout << pieceToString(state.currPiece) << std::endl;
-        std::cout << std::endl;
-
-        std::cout << "Cell:" << std::endl;
-        uint16_t row, col;
-        std::cin >> row >> col;
-        state.movePlace(rowColToCell(row, col));
-        std::cout << std::endl;
+            std::cout << "Cell:" << std::endl;
+            std::string str;
+            std::cin >> str;
+            std::cout << std::endl;
+            state.movePlace(stringToCell(str));
+        }
     }
 }
 
