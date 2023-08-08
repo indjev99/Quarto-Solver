@@ -276,7 +276,7 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
 
 int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
 {
-    if (state.isWon()) return state.movesLeft;
+    if (state.isWon()) return state.movesLeft + 1;
     if (state.isDone()) return 0;
 
     int16_t val = -INF;
@@ -308,7 +308,7 @@ std::string eval(State state)
 
     std::string str = val > 0 ? "Win in " : "Loss in ";
 
-    str += std::to_string(state.movesLeft - std::abs(val));
+    str += std::to_string(state.movesLeft + 1 - std::abs(val));
 
     return str;
 }
