@@ -3,6 +3,7 @@
 #include <string>
 #include <cctype>
 #include <vector>
+#include <algorithm>
 
 #define FOR_PROPS(i) for (uint16_t i = 0; i < NUM_PROPS; ++i)
 #define FOR_PROPS_VARS(i, j) for (uint16_t i = 0; i < NUM_PROPS; ++i) for (uint16_t j = 0; j < NUM_VARS; ++j) 
@@ -123,6 +124,7 @@ const std::vector<uint16_t> winMasks = computeWinMasks();
 
 struct State
 {
+    uint16_t movesLeft;
     uint16_t currPiece;
     uint16_t piecesTaken;
     uint16_t cellsTaken;
@@ -130,6 +132,7 @@ struct State
 
     State()
     {
+        movesLeft = 2 * std::min(NUM_PIECES, NUM_CELLS);
         currPiece = NO_PIECE;
         piecesTaken = 0;
         cellsTaken = 0;
@@ -142,23 +145,27 @@ struct State
 
     void moveSelect(uint16_t piece)
     {
-        assert(currPiece == NO_PIECE);
+        assert(!isToPlace());
 
         setBit(piecesTaken, piece);
         currPiece = piece;
+
+        --movesLeft;
     }
 
     void undoSelect()
     {
-        assert(currPiece != NO_PIECE);
+        assert(isToPlace());
 
         clearBit(piecesTaken, currPiece);
         currPiece = NO_PIECE;
+
+        ++movesLeft;
     }
 
     void movePlace(uint16_t cell)
     {
-        assert(currPiece != NO_PIECE);
+        assert(isToPlace());
 
         setBit(cellsTaken, cell);
 
@@ -168,11 +175,13 @@ struct State
         }
 
         currPiece = NO_PIECE;
+
+        --movesLeft;
     }
 
     void undoPlace(uint16_t piece, uint16_t cell)
     {
-        assert(currPiece == piece);
+        assert(!isToPlace());
 
         clearBit(cellsTaken, cell);
 
@@ -182,6 +191,41 @@ struct State
         }
 
         currPiece = piece;
+
+        ++movesLeft;
+    }
+
+    bool isToPlace()
+    {
+        return currPiece != NO_PIECE;
+    }
+
+    bool isPieceFree(uint16_t piece)
+    {
+        return !getBit(piecesTaken, piece);
+    }
+
+    bool isCellFree(uint16_t cell)
+    {
+        return !getBit(cellsTaken, cell);
+    }
+
+    bool isWon()
+    {
+        for (uint16_t winMask : winMasks)
+        {
+            FOR_PROPS_VARS(i, j)
+            {
+                if ((cellsProps[i][j] & winMask) == winMask) return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool isDone()
+    {
+        return movesLeft == 0;
     }
 
     uint16_t getPiece(uint16_t cell)
@@ -196,29 +240,72 @@ struct State
 
         return piece;
     }
-
-    bool isWon()
-    {
-        assert(currPiece == NO_PIECE);
-
-        for (uint16_t winMask : winMasks)
-        {
-            FOR_PROPS_VARS(i, j)
-            {
-                if ((cellsProps[i][j] & winMask) == winMask) return true;
-            }
-        }
-
-        return false;
-    }
-
-    bool isDone()
-    {
-        assert(currPiece == NO_PIECE);
-
-        return piecesTaken == (1 << NUM_PIECES) - 1 || cellsTaken == (1 << NUM_CELLS) - 1;
-    }
 };
+
+int16_t INF = 1000;
+
+int16_t sign(int16_t val)
+{
+    return (0 < val) - (val < 0);
+}
+
+int16_t evalSelect(State& state);
+
+int16_t evalPlace(State& state)
+{
+    int16_t val = -INF;
+
+    uint16_t piece = state.currPiece;
+
+    FOR_CELLS(i)
+    {
+        if (!state.isCellFree(i)) continue;
+
+        state.movePlace(i);
+        int16_t nextVal = evalSelect(state);
+        state.undoPlace(piece, i);
+
+        val = std::max(val, nextVal);
+    }
+
+    return val;
+}
+
+int16_t evalSelect(State& state)
+{
+    if (state.isWon()) return state.movesLeft;
+    if (state.isDone()) return 0;
+
+    int16_t val = -INF;
+
+    FOR_PIECES(i)
+    {
+        if (!state.isPieceFree(i)) continue;
+
+        state.moveSelect(i);
+        int16_t nextVal = -evalPlace(state);
+        state.undoSelect();
+
+        val = std::max(val, nextVal);
+    }
+
+    return val;
+}
+
+std::string eval(State state)
+{
+    int16_t val;
+    if (state.isToPlace()) val = evalPlace(state);
+    else val = evalSelect(state);
+
+    if (val == 0) return "Draw";
+
+    std::string str = val > 0 ? "Win in " : "Loss in ";
+
+    str += std::to_string(state.movesLeft - std::abs(val));
+
+    return str;
+}
 
 std::string pieceToString(uint16_t piece)
 {
@@ -258,7 +345,7 @@ uint16_t stringToPiece(std::string str)
 std::string cellToString(uint16_t cell)
 {
     uint16_t row = cellToRow(cell);
-    uint16_t col = cellToRow(cell);
+    uint16_t col = cellToCol(cell);
 
     char first = 'a' + col;
     char second = '1' + (NUM_ROWS - row - 1);
@@ -289,6 +376,11 @@ void play()
 {
     State state;
 
+    uint16_t player = 0;
+
+    int currMove = 0;
+    int minEvalMove = 17;
+
     while (true)
     {
         std::cout << "Board:" << std::endl;
@@ -312,43 +404,88 @@ void play()
         }
         std::cout << std::endl;
 
-        if (state.currPiece == NO_PIECE)
+        std::cout << "Player:" << std::endl;
+        std::cout << player + 1 << std::endl;
+        std::cout << std::endl;
+
+        if (currMove++ >= minEvalMove)
         {
-            if (state.isWon())
-            {
-                std::cout << "Win" << std::endl;
-                break;
-            }
-
-            if (state.isDone())
-            {
-                std::cout << "Draw" << std::endl;
-                break;
-            }
-
-            std::cout << "Piece:" << std::endl;
-            std::string str;
-            std::cin >> str;
+            std::cout << "Eval:" << std::endl;
+            std::cout << eval(state) << std::endl;
             std::cout << std::endl;
-            state.moveSelect(stringToPiece(str));
         }
-        else
+
+        if (state.isWon())
         {
-            std::cout << "Piece:" << std::endl;
-            std::cout << pieceToString(state.currPiece) << std::endl;
-            std::cout << std::endl;
-
-            std::cout << "Cell:" << std::endl;
-            std::string str;
-            std::cin >> str;
-            std::cout << std::endl;
-            state.movePlace(stringToCell(str));
+            std::cout << "Win" << std::endl;
+            break;
         }
+
+        if (state.isDone())
+        {
+            std::cout << "Draw" << std::endl;
+            break;
+        }
+
+        std::cout << "Piece:" << std::endl;
+        std::string pieceStr;
+        std::cin >> pieceStr;
+        std::cout << pieceStr << std::endl;
+        std::cout << std::endl;
+        state.moveSelect(stringToPiece(pieceStr));
+
+        player = 1 - player;
+
+        std::cout << "Player:" << std::endl;
+        std::cout << player + 1 << std::endl;
+        std::cout << std::endl;
+
+        if (currMove++ >= minEvalMove)
+        {
+            std::cout << "Eval:" << std::endl;
+            std::cout << eval(state) << std::endl;
+            std::cout << std::endl;
+        }
+
+        std::cout << "Cell:" << std::endl;
+        std::string cellStr;
+        std::cin >> cellStr;
+        std::cout << cellStr << std::endl;
+        std::cout << std::endl;
+        state.movePlace(stringToCell(cellStr));
+    }
+}
+
+void genRandGame(int seed)
+{
+    srand(seed);
+
+    std::vector<std::string> pieces;
+    FOR_PIECES(i)
+    {
+        pieces.push_back(pieceToString(i));
+    }
+
+    std::vector<std::string> cells;
+    FOR_CELLS(i)
+    {
+        cells.push_back(cellToString(i));
+    }
+
+    std::random_shuffle(pieces.begin(), pieces.end());
+    std::random_shuffle(cells.begin(), cells.end());
+
+    for (uint16_t i = 0; i < std::min(NUM_PIECES, NUM_CELLS); ++i)
+    {
+        std::cout << pieces[i] << std::endl;
+        std::cout << cells[i] << std::endl;
     }
 }
 
 int main()
 {
+    // genRandGame(42);
+
     play();
 
     return 0;
