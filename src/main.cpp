@@ -249,9 +249,9 @@ int16_t sign(int16_t val)
     return (0 < val) - (val < 0);
 }
 
-int16_t evalSelect(State& state);
+int16_t evalSelect(State& state, int16_t alpha, int16_t beta);
 
-int16_t evalPlace(State& state)
+int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
 {
     int16_t val = -INF;
 
@@ -262,16 +262,19 @@ int16_t evalPlace(State& state)
         if (!state.isCellFree(i)) continue;
 
         state.movePlace(i);
-        int16_t nextVal = evalSelect(state);
+        int16_t nextVal = evalSelect(state, alpha, beta);
         state.undoPlace(piece, i);
 
         val = std::max(val, nextVal);
+        alpha = std::max(alpha, val);
+
+        if (alpha >= beta) return alpha;
     }
 
     return val;
 }
 
-int16_t evalSelect(State& state)
+int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
 {
     if (state.isWon()) return state.movesLeft;
     if (state.isDone()) return 0;
@@ -283,10 +286,13 @@ int16_t evalSelect(State& state)
         if (!state.isPieceFree(i)) continue;
 
         state.moveSelect(i);
-        int16_t nextVal = -evalPlace(state);
+        int16_t nextVal = -evalPlace(state, -beta, -alpha);
         state.undoSelect();
 
         val = std::max(val, nextVal);
+        alpha = std::max(alpha, val);
+
+        if (alpha >= beta) return alpha;
     }
 
     return val;
@@ -295,8 +301,8 @@ int16_t evalSelect(State& state)
 std::string eval(State state)
 {
     int16_t val;
-    if (state.isToPlace()) val = evalPlace(state);
-    else val = evalSelect(state);
+    if (state.isToPlace()) val = evalPlace(state, -INF, INF);
+    else val = evalSelect(state, -INF, INF);
 
     if (val == 0) return "Draw";
 
@@ -379,7 +385,7 @@ void play()
     uint16_t player = 0;
 
     int currMove = 0;
-    int minEvalMove = 17;
+    int minEvalMove = 15;
 
     while (true)
     {
