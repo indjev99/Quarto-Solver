@@ -11,6 +11,9 @@
 #define FOR_CELLS(i) for (uint16_t i = 0; i < NUM_CELLS; ++i)
 #define FOR_WIN_LEN(i) for (uint16_t i = 0; i < WIN_LEN; ++i)
 
+using int128_t = __int128;
+using uint128_t = unsigned __int128;
+
 constexpr uint16_t NUM_VARS = 2;
 constexpr uint16_t NUM_PROPS = 4;
 constexpr uint16_t NUM_PIECES = 1 << NUM_PROPS;
@@ -119,6 +122,7 @@ std::vector<uint16_t> computeWinMasks()
 
     return winMasks;
 }
+
 
 const std::vector<uint16_t> winMasks = computeWinMasks();
 
@@ -240,18 +244,62 @@ struct State
 
         return piece;
     }
+
+    uint128_t getKey()
+    {
+        uint128_t key = 0;
+        key = ((key << 16) | cellsTaken);
+        FOR_PROPS(i)
+        {
+            key = ((key << 16) | cellsProps[i][0]);
+        }
+        return key;
+    }
 };
 
-int16_t INF = 1000;
-
-int16_t sign(int16_t val)
+struct TransTable
 {
-    return (0 < val) - (val < 0);
-}
+    struct Entry
+    {
+        uint128_t key : 80;
+        int128_t val : 16;
+        uint128_t isAlpha : 1;
+        uint128_t isBeta : 1;
+    };
 
-int16_t evalSelect(State& state, int16_t alpha, int16_t beta);
+    static_assert(sizeof(Entry) == 16);
+
+    std::vector<Entry> data;
+
+    TransTable(uint64_t size = 8388593): data(size) {}
+
+    uint64_t index(uint128_t key)
+    {
+        return key % data.size();
+    }
+
+    void put(uint128_t key, uint16_t val, bool isAlpha, bool isBeta)
+    {
+        uint64_t i = index(key);
+        data[i].key = key;
+        data[i].val = val;
+        data[i].isAlpha = isAlpha;
+        data[i].isBeta = isBeta;
+    }
+
+    Entry* get(uint128_t key)
+    {
+        uint64_t i = index(key);
+        if (data[i].key != key) return nullptr;
+        return &data[i];
+    }
+};
 
 uint64_t totalEvalStates;
+
+TransTable transTable;
+
+int16_t evalSelect(State& state, int16_t alpha, int16_t beta);
 
 int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
 {
@@ -259,26 +307,23 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
 
     uint16_t piece = state.currPiece;
 
-    bool hasWin = false;
-
     FOR_CELLS(i)
     {
         if (!state.isCellFree(i)) continue;
 
         state.movePlace(i);
-        hasWin = state.isWon();
+        bool isWin = state.isWon();
         state.undoPlace(piece, i);
 
-        if (hasWin) break;
+        if (isWin) return std::min<int16_t>(beta, state.movesLeft);
     }
 
-    if (hasWin) alpha = std::max<int16_t>(alpha, std::min<int16_t>(beta, state.movesLeft));
-    else beta = std::min<int16_t>(beta, std::max<int16_t>(state.movesLeft - 4, 0));
+    beta = std::min<int16_t>(beta, std::max<int16_t>(state.movesLeft - 4, 0));
+
+    if (alpha == beta) return alpha;
 
     FOR_CELLS(i)
     {
-        if (alpha == beta) break;
-
         if (!state.isCellFree(i)) continue;
 
         state.movePlace(i);
@@ -286,6 +331,8 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
         state.undoPlace(piece, i);
 
         alpha = std::max(alpha, nextVal);
+
+        if (alpha == beta) break;
     }
 
     return alpha;
@@ -295,10 +342,19 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
 {
     ++totalEvalStates;
 
+    int16_t oldAlpha = alpha;
+
+    uint128_t key = state.getKey();
+
+    TransTable::Entry* entry = transTable.get(key);
+
+    if (entry != nullptr && entry->isAlpha) alpha = std::max<int16_t>(alpha, std::min<int16_t>(beta, entry->val));
+    if (entry != nullptr && entry->isBeta) beta = std::min<int16_t>(beta, std::max<int16_t>(alpha, entry->val));
+
+    if (alpha == beta) return alpha;
+
     FOR_PIECES(i)
     {
-        if (alpha == beta) break;
-
         if (!state.isPieceFree(i)) continue;
 
         state.moveSelect(i);
@@ -306,7 +362,11 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
         state.undoSelect();
 
         alpha = std::max(alpha, nextVal);
+
+        if (alpha == beta) break;
     }
+
+    transTable.put(key, alpha, alpha > oldAlpha, alpha < beta);
 
     return alpha;
 }
@@ -404,7 +464,7 @@ void play()
     uint16_t player = 0;
 
     int currMove = 0;
-    int minEvalMove = 11;
+    int minEvalMove = 10;
 
     while (true)
     {
