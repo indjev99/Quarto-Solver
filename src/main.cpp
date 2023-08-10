@@ -2,6 +2,7 @@
 #include <cassert>
 #include <string>
 #include <cctype>
+#include <array>
 #include <vector>
 #include <algorithm>
 
@@ -123,8 +124,24 @@ std::vector<uint16_t> computeWinMasks()
     return winMasks;
 }
 
+std::array<std::vector<uint16_t>, NUM_CELLS> computeCellWinMasks(const std::vector<uint16_t>& winMasks)
+{
+    std::array<std::vector<uint16_t>, NUM_CELLS> cellWinMasks;
+
+    FOR_CELLS(i)
+    {
+        for (uint16_t winMask : winMasks)
+        {
+            if (getBit(winMask, i)) cellWinMasks[i].push_back(winMask);
+        }
+    }
+
+    return cellWinMasks;
+}
 
 const std::vector<uint16_t> winMasks = computeWinMasks();
+
+const std::array<std::vector<uint16_t>, NUM_CELLS> cellWinMasks = computeCellWinMasks(winMasks);
 
 struct State
 {
@@ -227,6 +244,19 @@ struct State
         return false;
     }
 
+    bool isWonCell(uint16_t cell)
+    {
+        for (uint16_t winMask : cellWinMasks[cell])
+        {
+            FOR_PROPS_VARS(i, j)
+            {
+                if ((cellsProps[i][j] & winMask) == winMask) return true;
+            }
+        }
+
+        return false;
+    }
+
     bool isDone()
     {
         return movesLeft == 0;
@@ -312,7 +342,7 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
         if (!state.isCellFree(i)) continue;
 
         state.movePlace(i);
-        bool isWin = state.isWon();
+        bool isWin = state.isWonCell(i);
         state.undoPlace(piece, i);
 
         if (isWin) return std::min<int16_t>(beta, state.movesLeft);
