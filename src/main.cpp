@@ -248,9 +248,9 @@ struct State
     {
         for (uint16_t winMask : cellWinMasks[cell])
         {
-            FOR_PROPS_VARS(i, j)
+            FOR_PROPS(i)
             {
-                if ((cellsProps[i][j] & winMask) == winMask) return true;
+                if ((cellsProps[i][getBit(cellsProps[i][1], cell)] & winMask) == winMask) return true;
             }
         }
 
