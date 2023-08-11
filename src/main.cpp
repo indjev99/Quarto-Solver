@@ -153,7 +153,7 @@ struct State
 
     State()
     {
-        movesLeft = 2 * std::min(NUM_PIECES, NUM_CELLS);
+        movesLeft = std::min(NUM_PIECES, NUM_CELLS);
         currPiece = NO_PIECE;
         piecesTaken = 0;
         cellsTaken = 0;
@@ -170,8 +170,6 @@ struct State
 
         setBit(piecesTaken, piece);
         currPiece = piece;
-
-        --movesLeft;
     }
 
     void undoSelect()
@@ -180,8 +178,6 @@ struct State
 
         clearBit(piecesTaken, currPiece);
         currPiece = NO_PIECE;
-
-        ++movesLeft;
     }
 
     void movePlace(uint16_t cell)
@@ -216,22 +212,22 @@ struct State
         ++movesLeft;
     }
 
-    bool isToPlace()
+    bool isToPlace() const
     {
         return currPiece != NO_PIECE;
     }
 
-    bool isPieceFree(uint16_t piece)
+    bool isPieceFree(uint16_t piece) const
     {
         return !getBit(piecesTaken, piece);
     }
 
-    bool isCellFree(uint16_t cell)
+    bool isCellFree(uint16_t cell) const
     {
         return !getBit(cellsTaken, cell);
     }
 
-    bool isWon()
+    bool isWon() const
     {
         for (uint16_t winMask : winMasks)
         {
@@ -244,7 +240,7 @@ struct State
         return false;
     }
 
-    bool isWonCell(uint16_t cell)
+    bool isWonCell(uint16_t cell) const
     {
         for (uint16_t winMask : cellWinMasks[cell])
         {
@@ -257,12 +253,12 @@ struct State
         return false;
     }
 
-    bool isDone()
+    bool isDone() const
     {
         return movesLeft == 0;
     }
 
-    uint16_t getPiece(uint16_t cell)
+    uint16_t getPiece(uint16_t cell) const
     {
         if (!getBit(cellsTaken, cell)) return NO_PIECE;
     
@@ -275,7 +271,7 @@ struct State
         return piece;
     }
 
-    uint128_t getKey()
+    uint128_t getKey() const
     {
         uint128_t key = 0;
         key = ((key << 16) | cellsTaken);
@@ -291,10 +287,10 @@ struct TransTable
 {
     struct Entry
     {
-        uint128_t key : 80;
-        int128_t val : 16;
-        uint128_t isAlpha : 1;
-        uint128_t isBeta : 1;
+        uint128_t key : 80 = 0;
+        int128_t val : 16 = 0;
+        uint128_t isAlpha : 1 = 0;
+        uint128_t isBeta : 1 = 0;
     };
 
     static_assert(sizeof(Entry) == 16);
@@ -303,9 +299,14 @@ struct TransTable
 
     TransTable(uint64_t size = 8388593): data(size) {}
 
-    uint64_t index(uint128_t key)
+    uint64_t index(uint128_t key) const
     {
         return key % data.size();
+    }
+
+    void clear()
+    {
+        std::fill(data.begin(), data.end(), Entry());
     }
 
     void put(uint128_t key, uint16_t val, bool isAlpha, bool isBeta)
@@ -317,7 +318,7 @@ struct TransTable
         data[i].isBeta = isBeta;
     }
 
-    Entry* get(uint128_t key)
+    const Entry* get(uint128_t key) const
     {
         uint64_t i = index(key);
         if (data[i].key != key) return nullptr;
@@ -335,6 +336,12 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
 {
     ++totalEvalStates;
 
+    assert(alpha < beta);
+
+    assert(state.movesLeft > 0);
+    assert(alpha >= - (state.movesLeft - 1));
+    assert(beta <= state.movesLeft);
+
     uint16_t piece = state.currPiece;
 
     FOR_CELLS(i)
@@ -345,10 +352,12 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
         bool isWin = state.isWonCell(i);
         state.undoPlace(piece, i);
 
-        if (isWin) return std::min<int16_t>(beta, state.movesLeft);
+        if (isWin) return std::min<int16_t>(beta, std::max<int16_t>(alpha, state.movesLeft));
     }
 
-    beta = std::min<int16_t>(beta, std::max<int16_t>(state.movesLeft - 4, 0));
+    beta = std::min<int16_t>(beta, std::max<int16_t>(alpha, std::max<int16_t>(state.movesLeft - 2, 0)));
+
+    assert(alpha <= beta);
 
     if (alpha == beta) return alpha;
 
@@ -359,6 +368,9 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
         state.movePlace(i);
         int16_t nextVal = evalSelect(state, alpha, beta);
         state.undoPlace(piece, i);
+
+        assert(alpha <= nextVal);
+        assert(nextVal <= beta);
 
         alpha = std::max(alpha, nextVal);
 
@@ -372,14 +384,22 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
 {
     ++totalEvalStates;
 
+    assert(alpha < beta);
+
+    assert(state.movesLeft > 0);
+    assert(alpha >= - state.movesLeft);
+    assert(beta <= state.movesLeft - 1);
+
     int16_t oldAlpha = alpha;
 
     uint128_t key = state.getKey();
 
-    TransTable::Entry* entry = transTable.get(key);
+    const TransTable::Entry* entry = transTable.get(key);
 
     if (entry != nullptr && entry->isAlpha) alpha = std::max<int16_t>(alpha, std::min<int16_t>(beta, entry->val));
     if (entry != nullptr && entry->isBeta) beta = std::min<int16_t>(beta, std::max<int16_t>(alpha, entry->val));
+
+    assert(alpha <= beta);
 
     if (alpha == beta) return alpha;
 
@@ -391,6 +411,9 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
         int16_t nextVal = -evalPlace(state, -beta, -alpha);
         state.undoSelect();
 
+        assert(alpha <= nextVal);
+        assert(nextVal <= beta);
+
         alpha = std::max(alpha, nextVal);
 
         if (alpha == beta) break;
@@ -401,17 +424,23 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
     return alpha;
 }
 
-std::string eval(State state)
+int16_t eval(State state)
 {
-    totalEvalStates = 0;
+    // transTable.clear();
 
-    int16_t val;
-    if (state.isWon()) val = state.movesLeft + 1;
-    else if (state.isDone()) val = 0;
-    else if (state.isToPlace()) val = evalPlace(state, - std::max<int16_t>(state.movesLeft - 2, 0), state.movesLeft);
-    else val = evalSelect(state, - std::max<int16_t>(state.movesLeft - 1, 0), std::max<int16_t>(state.movesLeft - 3, 0));
+    if (state.isWon()) return state.movesLeft + 1;
+    if (state.isDone()) return 0;
 
-    std::cerr << totalEvalStates << std::endl;
+    int16_t min = - (state.movesLeft - (state.isToPlace() ? 1 : 0));
+    int16_t max = state.movesLeft - (state.isToPlace() ? 0 : 1);
+    auto evalFunc = state.isToPlace() ? evalPlace : evalSelect;
+
+    return evalFunc(state, min, max);
+}
+
+std::string evalToString(const State& state, int16_t val)
+{
+    std::cerr << "nodes: " << totalEvalStates << std::endl;
 
     if (val == 0) return "Draw";
 
@@ -526,7 +555,7 @@ void play()
         if (currMove++ >= minEvalMove)
         {
             std::cout << "Eval:" << std::endl;
-            std::cout << eval(state) << std::endl;
+            std::cout << evalToString(state, eval(state)) << std::endl;
             std::cout << std::endl;
         }
 
@@ -558,7 +587,7 @@ void play()
         if (currMove++ >= minEvalMove)
         {
             std::cout << "Eval:" << std::endl;
-            std::cout << eval(state) << std::endl;
+            std::cout << evalToString(state, eval(state)) << std::endl;
             std::cout << std::endl;
         }
 
