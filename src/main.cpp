@@ -240,19 +240,6 @@ struct State
         return false;
     }
 
-    bool isWonCell(uint16_t cell) const
-    {
-        for (uint16_t winMask : cellWinMasks[cell])
-        {
-            FOR_PROPS(i)
-            {
-                if ((cellsProps[i][getBit(cellsProps[i][1], cell)] & winMask) == winMask) return true;
-            }
-        }
-
-        return false;
-    }
-
     bool isDone() const
     {
         return movesLeft == 0;
@@ -348,11 +335,16 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
     {
         if (!state.isCellFree(i)) continue;
 
-        state.movePlace(i);
-        bool isWin = state.isWonCell(i);
-        state.undoPlace(piece, i);
+        for (uint16_t winMask : cellWinMasks[i])
+        {
+            clearBit(winMask, i);
 
-        if (isWin) return std::min<int16_t>(beta, std::max<int16_t>(alpha, state.movesLeft));
+            FOR_PROPS(j)
+            {
+                if ((state.cellsProps[j][getBit(state.currPiece, j)] & winMask) == winMask)
+                    return std::min<int16_t>(beta, std::max<int16_t>(alpha, state.movesLeft));
+            }
+        }
     }
 
     beta = std::min<int16_t>(beta, std::max<int16_t>(alpha, std::max<int16_t>(state.movesLeft - 2, 0)));
