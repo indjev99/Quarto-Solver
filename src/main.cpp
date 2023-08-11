@@ -317,6 +317,36 @@ uint64_t totalEvalStates;
 
 TransTable transTable;
 
+constexpr uint16_t NUM_LOSE_MASKS = 1 << (NUM_PROPS * NUM_VARS);
+
+std::array<std::vector<uint16_t>, NUM_LOSE_MASKS> computeNotLosingSelects()
+{
+    std::array<std::vector<uint16_t>, NUM_LOSE_MASKS> notLosingSelects;
+
+    for (uint16_t loseMask = 0; loseMask < NUM_LOSE_MASKS; ++loseMask)
+    {
+        FOR_PIECES(i)
+        {
+            bool bad = false;
+
+            FOR_PROPS_VARS(j, k)
+            {
+                if (getBit(loseMask, j * NUM_VARS + k) && getBit(i, j) == k)
+                {
+                    bad = true;
+                    break;
+                }
+            }
+
+            if (!bad) notLosingSelects[loseMask].push_back(i);
+        }
+    }
+
+    return notLosingSelects;
+}
+
+const std::array<std::vector<uint16_t>, NUM_LOSE_MASKS> notLosingSelects = computeNotLosingSelects();
+
 int16_t evalSelect(State& state, int16_t alpha, int16_t beta);
 
 int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
@@ -327,31 +357,9 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
 
     assert(state.movesLeft > 0);
     assert(alpha >= - (state.movesLeft - 1));
-    assert(beta <= state.movesLeft);
+    assert(beta <= std::max<int16_t>(state.movesLeft - 2, 0));
 
     uint16_t piece = state.currPiece;
-
-    FOR_CELLS(i)
-    {
-        if (!state.isCellFree(i)) continue;
-
-        for (uint16_t winMask : cellWinMasks[i])
-        {
-            clearBit(winMask, i);
-
-            FOR_PROPS(j)
-            {
-                if ((state.cellsProps[j][getBit(state.currPiece, j)] & winMask) == winMask)
-                    return std::min<int16_t>(beta, std::max<int16_t>(alpha, state.movesLeft));
-            }
-        }
-    }
-
-    beta = std::min<int16_t>(beta, std::max<int16_t>(alpha, std::max<int16_t>(state.movesLeft - 2, 0)));
-
-    assert(alpha <= beta);
-
-    if (alpha == beta) return alpha;
 
     FOR_CELLS(i)
     {
@@ -384,6 +392,42 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
 
     int16_t oldAlpha = alpha;
 
+    bool losePropsVars[NUM_PROPS][NUM_VARS];
+
+    FOR_PROPS_VARS(i, j)
+    {
+        losePropsVars[i][j] = false;
+    }
+
+    FOR_CELLS(i)
+    {
+        if (!state.isCellFree(i)) continue;
+
+        for (uint16_t winMask : cellWinMasks[i])
+        {
+            clearBit(winMask, i);
+
+            if ((state.cellsTaken & winMask) != winMask) continue;
+
+            FOR_PROPS_VARS(i, j)
+            {
+                if ((state.cellsProps[i][j] & winMask) == winMask) losePropsVars[i][j] = true;
+            }
+        }
+    }
+
+    FOR_PROPS(i)
+    {
+        if (std::all_of(losePropsVars[i], losePropsVars[i] + NUM_VARS, [](bool x){return x;}))
+            return std::max<int16_t>(alpha, std::min<int16_t>(beta, -state.movesLeft));
+    }
+
+    alpha = std::max<int16_t>(alpha, std::min<int16_t>(beta, std::min<int16_t>(- (state.movesLeft - 2), 0)));
+
+    assert(alpha <= beta);
+
+    if (alpha == beta) return alpha;
+
     uint128_t key = state.getKey();
 
     const TransTable::Entry* entry = transTable.get(key);
@@ -395,7 +439,14 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
 
     if (alpha == beta) return alpha;
 
-    FOR_PIECES(i)
+    uint16_t loseMask = 0;
+
+    FOR_PROPS_VARS(i, j)
+    {
+        if (losePropsVars[i][j]) setBit(loseMask, i * NUM_VARS + j);
+    }
+
+    for (uint16_t i : notLosingSelects[loseMask])
     {
         if (!state.isPieceFree(i)) continue;
 
@@ -416,15 +467,38 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
     return alpha;
 }
 
+bool checkWinInOne(State& state)
+{
+    FOR_CELLS(i)
+    {
+        if (!state.isCellFree(i)) continue;
+
+        for (uint16_t winMask : cellWinMasks[i])
+        {
+            clearBit(winMask, i);
+
+            FOR_PROPS(j)
+            {
+                if ((state.cellsProps[j][getBit(state.currPiece, j)] & winMask) == winMask)
+                    return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 int16_t eval(State state)
 {
     // transTable.clear();
+    totalEvalStates = 0;
 
     if (state.isWon()) return state.movesLeft + 1;
     if (state.isDone()) return 0;
+    if (state.isToPlace() && checkWinInOne(state)) return state.movesLeft;
 
     int16_t min = - (state.movesLeft - (state.isToPlace() ? 1 : 0));
-    int16_t max = state.movesLeft - (state.isToPlace() ? 0 : 1);
+    int16_t max = std::max<int16_t>(state.movesLeft - (state.isToPlace() ? 2 : 1), 0);
     auto evalFunc = state.isToPlace() ? evalPlace : evalSelect;
 
     return evalFunc(state, min, max);
@@ -515,7 +589,7 @@ void play()
     uint16_t player = 0;
 
     int currMove = 0;
-    int minEvalMove = 10;
+    int minEvalMove = 9;
 
     while (true)
     {
