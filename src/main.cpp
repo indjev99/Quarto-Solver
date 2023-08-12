@@ -451,6 +451,7 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
     assert(beta <= state.movesLeft - 1);
 
     int16_t oldAlpha = alpha;
+    int16_t oldBeta = beta;
 
     bool losePropsVars[NUM_PROPS][NUM_VARS];
 
@@ -505,7 +506,7 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
         if (alpha == beta) break;
     }
 
-    transTable.put(key, alpha, alpha > oldAlpha, alpha < beta);
+    transTable.put(key, alpha, alpha > oldAlpha, alpha < oldBeta);
 
     return alpha;
 }
