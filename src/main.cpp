@@ -361,9 +361,33 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
 
     uint16_t piece = state.currPiece;
 
+    std::pair<int16_t, uint16_t> cellsPriors[NUM_CELLS];
+    uint16_t numMoves = 0;
+
     FOR_CELLS(i)
     {
         if (!state.isCellFree(i)) continue;
+
+        int16_t prior = 0;
+        for (uint16_t winMask : cellWinMasks[i])
+        {
+            clearBit(winMask, i);
+            FOR_PROPS(j)
+            {
+                prior += 16 * ((state.cellsProps[j][!getBit(piece, j)] & winMask) == winMask);
+                uint16_t leftover = (state.cellsProps[j][getBit(piece, j)] & winMask) ^ winMask;
+                prior -= (leftover & (leftover - 1)) == 0;
+            }
+        }
+
+        cellsPriors[numMoves++] = {prior, i};
+    }
+
+    std::sort(cellsPriors, cellsPriors + numMoves);
+
+    for (auto ptr = cellsPriors; ptr != cellsPriors + numMoves; ++ptr)
+    {
+        uint16_t i = ptr->second;
 
         state.movePlace(i);
         int16_t nextVal = evalSelect(state, alpha, beta);
