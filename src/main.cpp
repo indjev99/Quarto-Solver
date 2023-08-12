@@ -385,6 +385,8 @@ const std::array<std::vector<uint16_t>, NUM_LOSE_MASKS> notLosingSelects = compu
 
 int16_t evalSelect(State& state, int16_t alpha, int16_t beta);
 
+constexpr int16_t INF = (1 << 15) - 1;
+
 int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
 {
     ++totalEvalStates;
@@ -421,6 +423,8 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
 
     std::sort(cellsPriors, cellsPriors + numMoves);
 
+    int16_t val = -INF;
+
     for (auto ptr = cellsPriors; ptr != cellsPriors + numMoves; ++ptr)
     {
         uint16_t i = ptr->second;
@@ -429,15 +433,15 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
         int16_t nextVal = evalSelect(state, alpha, beta);
         state.undoPlace(piece, i);
 
-        assert(alpha <= nextVal);
-        assert(nextVal <= beta);
-
-        alpha = std::max(alpha, nextVal);
-
-        if (alpha == beta) break;
+        if (nextVal > val)
+        {
+            val = nextVal;
+            alpha = std::max(alpha, val);
+            if (alpha >= beta) break;
+        }
     }
 
-    return alpha;
+    return val;
 }
 
 int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
@@ -463,25 +467,30 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
     FOR_PROPS(i)
     {
         if (std::all_of(losePropsVars[i], losePropsVars[i] + NUM_VARS, [](bool x){return x;}))
-            return std::max<int16_t>(alpha, std::min<int16_t>(beta, -state.movesLeft));
+            return -state.movesLeft;
     }
 
-    alpha = std::max<int16_t>(alpha, std::min<int16_t>(beta, std::min<int16_t>(- (state.movesLeft - 2), 0)));
+    if (state.movesLeft == 1) return 0;
 
-    assert(alpha <= beta);
+    alpha = std::max<int16_t>(alpha, - (state.movesLeft - 2));
 
-    if (alpha == beta) return alpha;
+    if (alpha >= beta) return alpha;
 
     uint128_t key = state.getKey();
 
     const TransTable::Entry* entry = transTable.get(key);
 
-    if (entry != nullptr && entry->isAlpha) alpha = std::max<int16_t>(alpha, std::min<int16_t>(beta, entry->val));
-    if (entry != nullptr && entry->isBeta) beta = std::min<int16_t>(beta, std::max<int16_t>(alpha, entry->val));
+    if (entry != nullptr && entry->isAlpha && entry->val > alpha)
+    {
+        alpha = entry->val;
+        if (alpha >= beta) return alpha;
+    }
 
-    assert(alpha <= beta);
-
-    if (alpha == beta) return alpha;
+    if (entry != nullptr && entry->isBeta && entry->val < beta)
+    {
+        beta = entry->val;
+        if (alpha >= beta) return beta;
+    }
 
     uint16_t loseMask = 0;
 
@@ -489,6 +498,8 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
     {
         if (losePropsVars[i][j]) setBit(loseMask, i * NUM_VARS + j);
     }
+
+    int16_t val = -INF;
 
     for (uint16_t i : notLosingSelects[loseMask])
     {
@@ -498,17 +509,17 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
         int16_t nextVal = -evalPlace(state, -beta, -alpha);
         state.undoSelect();
 
-        assert(alpha <= nextVal);
-        assert(nextVal <= beta);
-
-        alpha = std::max(alpha, nextVal);
-
-        if (alpha == beta) break;
+        if (nextVal > val)
+        {
+            val = nextVal;
+            alpha = std::max(alpha, val);
+            if (alpha >= beta) break;
+        }
     }
 
-    transTable.put(key, alpha, alpha > oldAlpha, alpha < oldBeta);
+    transTable.put(key, val, val > oldAlpha, val < oldBeta);
 
-    return alpha;
+    return val;
 }
 
 bool checkWinInOne(State& state)
