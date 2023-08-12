@@ -410,11 +410,21 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
         for (uint16_t winMask : cellWinMasks[i])
         {
             clearBit(winMask, i);
-            FOR_PROPS(j)
+
+            if ((state.cellsTaken & winMask) == winMask)
             {
-                prior += 2 * ((state.cellsProps[j][!getBit(piece, j)] & winMask) == winMask);
-                uint16_t leftover = (state.cellsProps[j][getBit(piece, j)] & winMask) ^ winMask;
-                prior -= (leftover & ~state.cellsTaken) != 0 && (leftover & (leftover - 1)) == 0;
+                FOR_PROPS(j)
+                {
+                    prior += 2 * ((state.cellsProps[j][!getBit(piece, j)] & winMask) == winMask);
+                }
+            }
+            else
+            {
+                FOR_PROPS(j)
+                {
+                    uint16_t leftover = (state.cellsProps[j][getBit(piece, j)] & winMask) ^ winMask;
+                    prior -= (leftover & (leftover - 1)) == 0;
+                }
             }
         }
 
