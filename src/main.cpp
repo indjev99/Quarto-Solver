@@ -392,12 +392,7 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
 
     int16_t oldAlpha = alpha;
 
-    bool losePropsVars[NUM_PROPS][NUM_VARS];
-
-    FOR_PROPS_VARS(i, j)
-    {
-        losePropsVars[i][j] = false;
-    }
+    bool losePropsVars[NUM_PROPS][NUM_VARS] = {};
 
     FOR_CELLS(i)
     {
