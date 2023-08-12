@@ -317,6 +317,42 @@ uint64_t totalEvalStates;
 
 TransTable transTable;
 
+constexpr uint32_t NUM_PROP_VAR_MASKS = 1 << NUM_CELLS;
+
+std::array<uint16_t, NUM_PROP_VAR_MASKS> computeLosePropVarCells()
+{
+    std::array<uint16_t, NUM_PROP_VAR_MASKS> losePropVarCells;
+
+    uint16_t lastMask = NUM_PROP_VAR_MASKS - 1;
+
+    for (uint16_t propVarMask = 0; ; ++propVarMask)
+    {
+        losePropVarCells[propVarMask] = 0;
+
+        FOR_CELLS(i)
+        {
+            if (getBit(propVarMask, i)) continue;
+
+            for (uint16_t winMask : cellWinMasks[i])
+            {
+                clearBit(winMask, i);
+
+                if ((propVarMask & winMask) == winMask)
+                {
+                    setBit(losePropVarCells[propVarMask], i);
+                    break;
+                }
+            }
+        }
+
+        if (propVarMask == lastMask) break;
+    }
+
+    return losePropVarCells;
+}
+
+const std::array<uint16_t, NUM_PROP_VAR_MASKS> losePropVarCells = computeLosePropVarCells();
+
 constexpr uint16_t NUM_LOSE_MASKS = 1 << (NUM_PROPS * NUM_VARS);
 
 std::array<std::vector<uint16_t>, NUM_LOSE_MASKS> computeNotLosingSelects()
@@ -416,23 +452,11 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
 
     int16_t oldAlpha = alpha;
 
-    bool losePropsVars[NUM_PROPS][NUM_VARS] = {};
+    bool losePropsVars[NUM_PROPS][NUM_VARS];
 
-    FOR_CELLS(i)
+    FOR_PROPS_VARS(i, j)
     {
-        if (!state.isCellFree(i)) continue;
-
-        for (uint16_t winMask : cellWinMasks[i])
-        {
-            clearBit(winMask, i);
-
-            if ((state.cellsTaken & winMask) != winMask) continue;
-
-            FOR_PROPS_VARS(i, j)
-            {
-                if ((state.cellsProps[i][j] & winMask) == winMask) losePropsVars[i][j] = true;
-            }
-        }
+        losePropsVars[i][j] = ~state.cellsTaken & losePropVarCells[state.cellsProps[i][j]];
     }
 
     FOR_PROPS(i)
@@ -608,7 +632,7 @@ void play()
     uint16_t player = 0;
 
     int currMove = 0;
-    int minEvalMove = 9;
+    int minEvalMove = 7;
 
     while (true)
     {
