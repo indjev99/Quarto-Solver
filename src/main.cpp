@@ -5,6 +5,7 @@
 #include <array>
 #include <vector>
 #include <algorithm>
+#include <fstream>
 
 #define FOR_PROPS(i) for (uint16_t i = 0; i < NUM_PROPS; ++i)
 #define FOR_PROPS_VARS(i, j) for (uint16_t i = 0; i < NUM_PROPS; ++i) for (uint16_t j = 0; j < NUM_VARS; ++j) 
@@ -650,12 +651,72 @@ int16_t eval(State state)
     if (state.isWon()) return state.movesLeft + 1;
     if (state.isDone()) return 0;
     if (state.isToPlace() && checkWinInOne(state)) return state.movesLeft;
+    if (state.isToPlace() && state.movesLeft == 1) return 0;
 
     int16_t min = - (state.movesLeft - (state.isToPlace() ? 1 : 0));
-    int16_t max = std::max<int16_t>(state.movesLeft - (state.isToPlace() ? 2 : 1), 0);
+    int16_t max = state.movesLeft - (state.isToPlace() ? 2 : 1);
     auto evalFunc = state.isToPlace() ? evalPlace : evalSelect;
 
     return evalFunc(state, min, max);
+}
+
+void recInitTransTable(State& state, uint16_t depth)
+{
+    eval(state);
+
+    if (depth == 0) return;
+    if (state.isWon()) return;
+    if (state.isDone()) return;
+
+    if (state.isToPlace())
+    {
+        uint16_t piece = state.currPiece;
+
+        FOR_CELLS(i)
+        {
+            if (!state.isCellFree(i)) continue;
+
+            state.movePlace(i);
+            recInitTransTable(state, depth - 1);
+            state.undoPlace(piece, i);
+        }
+    }
+    else
+    {
+        FOR_PIECES(i)
+        {
+            if (!state.isPieceFree(i)) continue;
+
+            state.moveSelect(i);
+            recInitTransTable(state, depth - 1);
+            state.undoSelect();
+        }
+    }
+}
+
+void initTransTable()
+{
+    std::string fileName = "tt.dat";
+
+    std::ifstream inFile(fileName, std::ios::in | std::ios::binary);
+
+    if (inFile.good())
+    {
+        inFile.read((char*) transTables[0].data.data(), sizeof(TransTable::Entry) * transTables[0].data.size());
+    }
+
+    inFile.close();
+
+    for (uint16_t depth = 0; depth <= 6; ++depth)
+    {
+        std::cerr << "Init with depth: " << depth << std::endl;
+
+        State state;
+        recInitTransTable(state, depth);
+
+        std::ofstream outFile(fileName, std::ios::out | std::ios::binary);
+        outFile.write((char*) transTables[0].data.data(), sizeof(TransTable::Entry) * transTables[0].data.size());
+    }
 }
 
 std::string evalToString(const State& state, int16_t val)
@@ -742,9 +803,6 @@ void play()
 
     uint16_t player = 0;
 
-    int currMove = 0;
-    int minEvalMove = 7;
-
     while (true)
     {
         std::cout << "Board:" << std::endl;
@@ -772,12 +830,9 @@ void play()
         std::cout << player + 1 << std::endl;
         std::cout << std::endl;
 
-        if (currMove++ >= minEvalMove)
-        {
-            std::cout << "Eval:" << std::endl;
-            std::cout << evalToString(state, eval(state)) << std::endl;
-            std::cout << std::endl;
-        }
+        std::cout << "Eval:" << std::endl;
+        std::cout << evalToString(state, eval(state)) << std::endl;
+        std::cout << std::endl;
 
         if (state.isWon())
         {
@@ -796,6 +851,7 @@ void play()
         std::cin >> pieceStr;
         std::cout << pieceStr << std::endl;
         std::cout << std::endl;
+
         state.moveSelect(stringToPiece(pieceStr));
 
         player = 1 - player;
@@ -804,18 +860,16 @@ void play()
         std::cout << player + 1 << std::endl;
         std::cout << std::endl;
 
-        if (currMove++ >= minEvalMove)
-        {
-            std::cout << "Eval:" << std::endl;
-            std::cout << evalToString(state, eval(state)) << std::endl;
-            std::cout << std::endl;
-        }
+        std::cout << "Eval:" << std::endl;
+        std::cout << evalToString(state, eval(state)) << std::endl;
+        std::cout << std::endl;
 
         std::cout << "Cell:" << std::endl;
         std::string cellStr;
         std::cin >> cellStr;
         std::cout << cellStr << std::endl;
         std::cout << std::endl;
+
         state.movePlace(stringToCell(cellStr));
     }
 }
@@ -848,9 +902,9 @@ void genRandGame(int seed)
 
 int main()
 {
-    // genRandGame(42);
+    initTransTable();
 
-    play();
+    // play();
 
     return 0;
 }
