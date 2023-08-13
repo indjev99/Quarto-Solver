@@ -124,7 +124,9 @@ std::vector<uint16_t> computeWinMasks()
     return winMasks;
 }
 
-std::array<std::vector<uint16_t>, NUM_CELLS> computeCellWinMasks(const std::vector<uint16_t>& winMasks)
+const std::vector<uint16_t> winMasks = computeWinMasks();
+
+std::array<std::vector<uint16_t>, NUM_CELLS> computeCellWinMasks()
 {
     std::array<std::vector<uint16_t>, NUM_CELLS> cellWinMasks;
 
@@ -139,9 +141,49 @@ std::array<std::vector<uint16_t>, NUM_CELLS> computeCellWinMasks(const std::vect
     return cellWinMasks;
 }
 
-const std::vector<uint16_t> winMasks = computeWinMasks();
+const std::array<std::vector<uint16_t>, NUM_CELLS> cellWinMasks = computeCellWinMasks();
 
-const std::array<std::vector<uint16_t>, NUM_CELLS> cellWinMasks = computeCellWinMasks(winMasks);
+constexpr uint32_t NUM_CELL_MASKS = 1 << NUM_CELLS;
+
+constexpr uint16_t NUM_ROTS = 8;
+
+std::array<std::array<uint16_t, NUM_CELL_MASKS>, NUM_ROTS> computeRotMasks()
+{
+    static_assert(NUM_ROWS == NUM_COLS);
+
+    std::array<std::array<uint16_t, NUM_CELL_MASKS>, NUM_ROTS> rotMasks;
+
+    for (uint16_t rot = 0; rot < NUM_ROTS; ++rot)
+    {
+        for (uint32_t mask = 0; mask < NUM_CELL_MASKS; ++mask)
+        {
+            if (rot == 0)
+            {
+                rotMasks[rot][mask] = mask;
+                continue;
+            }
+
+            uint16_t prev = rotMasks[rot != NUM_ROTS / 2 ? rot - 1 : 0][mask];
+            uint16_t next = 0;
+
+            FOR_CELLS(i)
+            {
+                uint16_t row = cellToRow(i);
+                uint16_t col = cellToCol(i);
+                uint16_t row2 = rot != NUM_ROTS / 2 ? NUM_COLS - col - 1 : NUM_COLS - row - 1;
+                uint16_t col2 = rot != NUM_ROTS / 2 ? row : col;
+                uint16_t i2 = rowColToCell(row2, col2);
+                if (getBit(prev, i)) setBit(next, i2);
+            }
+
+            rotMasks[rot][mask] = next;
+        }
+    }
+
+    return rotMasks;
+}
+
+const std::array<std::array<uint16_t, NUM_CELL_MASKS>, NUM_ROTS> rotMasks = computeRotMasks();
 
 struct State
 {
@@ -260,13 +302,38 @@ struct State
 
     uint128_t getKey() const
     {
-        uint128_t key = 0;
-        key = ((key << 16) | cellsTaken);
-        FOR_PROPS(i)
+        uint128_t minKey = -1;
+    
+        uint16_t minCellsTaken = -1;
+
+        for (uint16_t rot = 0; rot < NUM_ROTS; ++rot)
         {
-            key = ((key << 16) | cellsProps[i][0]);
+            minCellsTaken = std::min(minCellsTaken, rotMasks[rot][cellsTaken]);
         }
-        return key;
+
+        for (uint16_t rot = 0; rot < NUM_ROTS; ++rot)
+        {
+            if (rotMasks[rot][cellsTaken] != minCellsTaken) continue;
+
+            uint16_t otherCellsProps[NUM_PROPS];
+
+            FOR_PROPS(i)
+            {
+                otherCellsProps[i] = std::min(rotMasks[rot][cellsProps[i][0]], rotMasks[rot][cellsProps[i][1]]);
+            }
+
+            std::sort(otherCellsProps, otherCellsProps + NUM_PROPS);
+
+            uint128_t key = minCellsTaken;
+            FOR_PROPS(i)
+            {
+                key = ((key << 16) | otherCellsProps[i]);
+            }
+    
+            minKey = std::min<uint128_t>(minKey, key);
+        }
+
+        return minKey;
     }
 };
 
@@ -317,13 +384,11 @@ uint64_t totalEvalStates;
 
 TransTable transTable;
 
-constexpr uint32_t NUM_PROP_VAR_MASKS = 1 << NUM_CELLS;
-
-std::array<uint16_t, NUM_PROP_VAR_MASKS> computeLosePropVarCells()
+std::array<uint16_t, NUM_CELL_MASKS> computeLosePropVarCells()
 {
-    std::array<uint16_t, NUM_PROP_VAR_MASKS> losePropVarCells;
+    std::array<uint16_t, NUM_CELL_MASKS> losePropVarCells;
 
-    uint16_t lastMask = NUM_PROP_VAR_MASKS - 1;
+    uint16_t lastMask = NUM_CELL_MASKS - 1;
 
     for (uint16_t propVarMask = 0; ; ++propVarMask)
     {
@@ -351,7 +416,7 @@ std::array<uint16_t, NUM_PROP_VAR_MASKS> computeLosePropVarCells()
     return losePropVarCells;
 }
 
-const std::array<uint16_t, NUM_PROP_VAR_MASKS> losePropVarCells = computeLosePropVarCells();
+const std::array<uint16_t, NUM_CELL_MASKS> losePropVarCells = computeLosePropVarCells();
 
 constexpr uint16_t NUM_LOSE_MASKS = 1 << (NUM_PROPS * NUM_VARS);
 
