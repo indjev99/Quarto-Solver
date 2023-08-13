@@ -46,7 +46,7 @@ uint16_t cellToCol(uint16_t cell)
 
 uint16_t getBit(uint16_t val, uint16_t n)
 {
-    return (val & (1 << n)) >> n;
+    return (val >> n) & 1;
 }
 
 void setBit(uint16_t& val, uint16_t n)
