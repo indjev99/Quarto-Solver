@@ -24,6 +24,8 @@ constexpr uint16_t NUM_ROWS = 4;
 constexpr uint16_t NUM_COLS = 4;
 constexpr uint16_t NUM_CELLS = NUM_ROWS * NUM_COLS;
 
+constexpr uint16_t NUM_MOVES = std::min(NUM_PIECES, NUM_CELLS);
+
 constexpr uint16_t WIN_LEN = 4;
 constexpr uint16_t WIN_SQ_SIDE = 2;
 
@@ -195,7 +197,7 @@ struct State
 
     State()
     {
-        movesLeft = std::min(NUM_PIECES, NUM_CELLS);
+        movesLeft = NUM_MOVES;
         currPiece = NO_PIECE;
         piecesTaken = 0;
         cellsTaken = 0;
@@ -383,9 +385,10 @@ struct TransTable
     }
 };
 
-uint64_t totalEvalStates;
+constexpr uint16_t TT_DIV = 5;
+constexpr uint16_t NUM_TTS = (NUM_MOVES - 2) / TT_DIV + 1;
 
-TransTable transTable;
+TransTable transTables[NUM_TTS];
 
 std::array<uint16_t, NUM_CELL_MASKS> computeLosePropVarCells()
 {
@@ -451,9 +454,11 @@ std::array<std::vector<uint16_t>, NUM_LOSE_MASKS> computeNotLosingSelects()
 
 const std::array<std::vector<uint16_t>, NUM_LOSE_MASKS> notLosingSelects = computeNotLosingSelects();
 
-int16_t evalSelect(State& state, int16_t alpha, int16_t beta);
-
 constexpr int16_t INF = (1 << 15) - 1;
+
+uint64_t totalEvalStates;
+
+int16_t evalSelect(State& state, int16_t alpha, int16_t beta);
 
 int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
 {
@@ -574,7 +579,11 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
 
     uint128_t key = state.getKey();
 
-    const TransTable::Entry* entry = transTable.get(key);
+    uint16_t movesDone = NUM_MOVES - state.movesLeft;
+
+    TransTable& currTransTable = transTables[movesDone / TT_DIV];
+
+    const TransTable::Entry* entry = currTransTable.get(key);
 
     if (entry != nullptr && entry->isAlpha && entry->val > alpha)
     {
@@ -608,7 +617,7 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
 
     assert(val > -INF);
 
-    transTable.put(key, val, val > oldAlpha, val < oldBeta);
+    currTransTable.put(key, val, val > oldAlpha, val < oldBeta);
 
     return val;
 }
@@ -636,7 +645,6 @@ bool checkWinInOne(State& state)
 
 int16_t eval(State state)
 {
-    // transTable.clear();
     totalEvalStates = 0;
 
     if (state.isWon()) return state.movesLeft + 1;
