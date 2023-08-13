@@ -493,6 +493,8 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
             }
         }
 
+        if (state.movesLeft == 2) prior = -prior;
+
         cellsPriors[numMoves++] = {prior, i};
     }
 
@@ -515,6 +517,8 @@ int16_t evalPlace(State& state, int16_t alpha, int16_t beta)
             if (alpha >= beta) break;
         }
     }
+
+    assert(val > -INF);
 
     return val;
 }
@@ -539,11 +543,25 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
         losePropsVars[i][j] = ~state.cellsTaken & losePropVarCells[state.cellsProps[i][j]];
     }
 
-    FOR_PROPS(i)
+    uint16_t loseMask = 0;
+
+    FOR_PROPS_VARS(i, j)
     {
-        if (std::all_of(losePropsVars[i], losePropsVars[i] + NUM_VARS, [](bool x){return x;}))
-            return -state.movesLeft;
+        if (losePropsVars[i][j]) setBit(loseMask, i * NUM_VARS + j);
     }
+
+    bool haveMove = false;
+
+    for (uint16_t i : notLosingSelects[loseMask])
+    {
+        if (state.isPieceFree(i))
+        {
+            haveMove = true;
+            break;
+        }
+    }
+
+    if (!haveMove) return - state.movesLeft;
 
     if (state.movesLeft == 1) return 0;
 
@@ -567,13 +585,6 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
         if (alpha >= beta) return beta;
     }
 
-    uint16_t loseMask = 0;
-
-    FOR_PROPS_VARS(i, j)
-    {
-        if (losePropsVars[i][j]) setBit(loseMask, i * NUM_VARS + j);
-    }
-
     int16_t val = -INF;
 
     for (uint16_t i : notLosingSelects[loseMask])
@@ -591,6 +602,8 @@ int16_t evalSelect(State& state, int16_t alpha, int16_t beta)
             if (alpha >= beta) break;
         }
     }
+
+    assert(val > -INF);
 
     transTable.put(key, val, val > oldAlpha, val < oldBeta);
 
