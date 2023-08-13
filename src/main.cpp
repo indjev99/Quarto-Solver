@@ -337,21 +337,24 @@ struct State
     }
 };
 
+constexpr uint16_t KEY_BITS = 56;
+constexpr uint64_t KEY_BITS_MASK = (1ull << KEY_BITS) - 1;
+
 struct TransTable
 {
     struct Entry
     {
-        uint128_t key : 80 = 0;
-        int128_t val : 16 = 0;
-        uint128_t isAlpha : 1 = 0;
-        uint128_t isBeta : 1 = 0;
+        uint64_t key : KEY_BITS = 0;
+        int64_t val : 6 = 0;
+        uint64_t isAlpha : 1 = 0;
+        uint64_t isBeta : 1 = 0;
     };
 
-    static_assert(sizeof(Entry) == 16);
+    static_assert(sizeof(Entry) == 8);
 
     std::vector<Entry> data;
 
-    TransTable(uint64_t size = 8388593): data(size) {}
+    TransTable(uint64_t size = 16782823): data(size) {}
 
     uint64_t index(uint128_t key) const
     {
@@ -363,7 +366,7 @@ struct TransTable
         std::fill(data.begin(), data.end(), Entry());
     }
 
-    void put(uint128_t key, uint16_t val, bool isAlpha, bool isBeta)
+    void put(uint128_t key, int16_t val, bool isAlpha, bool isBeta)
     {
         uint64_t i = index(key);
         data[i].key = key;
@@ -375,7 +378,7 @@ struct TransTable
     const Entry* get(uint128_t key) const
     {
         uint64_t i = index(key);
-        if (data[i].key != key) return nullptr;
+        if (data[i].key != (key & KEY_BITS_MASK)) return nullptr;
         return &data[i];
     }
 };
