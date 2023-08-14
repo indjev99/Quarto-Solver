@@ -5,6 +5,7 @@
 #include <array>
 #include <vector>
 #include <algorithm>
+#include <map>
 #include <fstream>
 
 #define FOR_PROPS(i) for (uint16_t i = 0; i < NUM_PROPS; ++i)
@@ -660,6 +661,46 @@ int16_t eval(State state)
     return evalFunc(state, min, max);
 }
 
+std::vector<std::pair<int16_t, std::vector<uint16_t>>> evalMoves(State state)
+{
+    if (state.isWon() || state.isDone()) return {};
+
+    std::map<int16_t, std::vector<uint16_t>> valsMoves;
+
+    if (state.isToPlace())
+    {
+        uint16_t piece = state.currPiece;
+        FOR_CELLS(i)
+        {
+            if (!state.isCellFree(i)) continue;
+
+            state.movePlace(i);
+            int16_t val = eval(state);
+            state.undoPlace(piece, i);
+
+            valsMoves[val].push_back(i);
+        }
+    }
+    else
+    {
+        FOR_PIECES(i)
+        {
+            if (!state.isPieceFree(i)) continue;
+
+            state.moveSelect(i);
+            int16_t val = - eval(state);
+            state.undoSelect();
+
+            valsMoves[val].push_back(i);
+        }
+    }
+
+    std::vector<std::pair<int16_t, std::vector<uint16_t>>> valsMovesVec(valsMoves.begin(), valsMoves.end());
+    std::reverse(valsMovesVec.begin(), valsMovesVec.end());
+
+    return valsMovesVec;
+}
+
 void recInitTransTable(State& state, uint16_t depth)
 {
     eval(state);
@@ -702,18 +743,22 @@ void initTransTable()
 
     if (inFile.good())
     {
+        std::cerr << "Loading transposition table: " << fileName << std::endl;
+
         inFile.read((char*) transTables[0].data.data(), sizeof(TransTable::Entry) * transTables[0].data.size());
+
+        return;
     }
 
     inFile.close();
 
-    for (uint16_t depth = 0; depth <= 6; ++depth)
+    for (uint16_t depth = 0; depth <= 8; ++depth)
     {
-        std::cerr << "Init with depth: " << depth << std::endl;
+        std::cerr << "Populating transposition table with depth: " << depth << std::endl;
 
         State state;
         recInitTransTable(state, depth);
-
+    
         std::ofstream outFile(fileName, std::ios::out | std::ios::binary);
         outFile.write((char*) transTables[0].data.data(), sizeof(TransTable::Entry) * transTables[0].data.size());
     }
@@ -721,8 +766,6 @@ void initTransTable()
 
 std::string evalToString(const State& state, int16_t val)
 {
-    std::cerr << "nodes: " << totalEvalStates << std::endl;
-
     if (val == 0) return "Draw";
 
     std::string str = val > 0 ? "Win in " : "Loss in ";
@@ -773,7 +816,7 @@ std::string cellToString(uint16_t cell)
     uint16_t col = cellToCol(cell);
 
     char first = 'a' + col;
-    char second = '1' + (NUM_ROWS - row - 1);
+    char second = '1' + row;
 
     std::string str;
     str += first;
@@ -786,7 +829,7 @@ uint16_t stringToCell(std::string str)
 {
     assert(str.size() == 2);
 
-    uint16_t row = NUM_ROWS - (str[1] - '1') - 1;
+    uint16_t row = str[1] - '1';
     uint16_t col = str[0] - 'a';
 
     assert(row >= 0 && row < NUM_ROWS);
@@ -808,6 +851,7 @@ void play()
         std::cout << "Board:" << std::endl;
         std::cout << "+----+----+----+----+";
         std::cout << std::endl;
+
         FOR_CELLS(i)
         {
             std::cout << "| ";
@@ -834,6 +878,17 @@ void play()
         std::cout << evalToString(state, eval(state)) << std::endl;
         std::cout << std::endl;
 
+        std::cout << "Moves:" << std::endl;
+        for (const auto& [val, moves] : evalMoves(state))
+        {
+            for (uint16_t move : moves)
+            {
+                std::cout << pieceToString(move) << " ";
+            }
+            std::cout << ": " << evalToString(state, val) << std::endl;
+        }
+        std::cout << std::endl;
+
         if (state.isWon())
         {
             std::cout << "Win" << std::endl;
@@ -849,7 +904,7 @@ void play()
         std::cout << "Piece:" << std::endl;
         std::string pieceStr;
         std::cin >> pieceStr;
-        std::cout << pieceStr << std::endl;
+        std::cerr << pieceStr << std::endl;
         std::cout << std::endl;
 
         state.moveSelect(stringToPiece(pieceStr));
@@ -864,10 +919,21 @@ void play()
         std::cout << evalToString(state, eval(state)) << std::endl;
         std::cout << std::endl;
 
+        std::cout << "Moves:" << std::endl;
+        for (const auto& [val, moves] : evalMoves(state))
+        {
+            for (uint16_t move : moves)
+            {
+                std::cout << cellToString(move) << " ";
+            }
+            std::cout << ": " << evalToString(state, val) << std::endl;
+        }
+        std::cout << std::endl;
+
         std::cout << "Cell:" << std::endl;
         std::string cellStr;
         std::cin >> cellStr;
-        std::cout << cellStr << std::endl;
+        std::cerr << cellStr << std::endl;
         std::cout << std::endl;
 
         state.movePlace(stringToCell(cellStr));
@@ -904,7 +970,7 @@ int main()
 {
     initTransTable();
 
-    // play();
+    play();
 
     return 0;
 }
