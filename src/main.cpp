@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <map>
 #include <fstream>
+#include <random>
+#include <ctime>
 
 #define FOR_PROPS(i) for (uint16_t i = 0; i < NUM_PROPS; ++i)
 #define FOR_PROPS_VARS(i, j) for (uint16_t i = 0; i < NUM_PROPS; ++i) for (uint16_t j = 0; j < NUM_VARS; ++j) 
@@ -16,6 +18,15 @@
 
 using int128_t = __int128;
 using uint128_t = unsigned __int128;
+
+std::mt19937 generator(time(nullptr));
+
+template <class T>
+auto randElem(const T& cont)
+{
+    std::uniform_int_distribution<uint32_t> distr(0, cont.size() - 1);
+    return cont[distr(generator)];
+}
 
 constexpr uint16_t NUM_VARS = 2;
 constexpr uint16_t NUM_PROPS = 4;
@@ -65,7 +76,7 @@ void clearBit(uint16_t& val, uint16_t n)
     val &= ~(1 << n);
 }
 
-std::vector<uint16_t> computeWinMasks()
+std::vector<uint16_t> computeRegWinMasks()
 {
     std::vector<uint16_t> winMasks;
 
@@ -128,7 +139,65 @@ std::vector<uint16_t> computeWinMasks()
     return winMasks;
 }
 
-const std::vector<uint16_t> winMasks = computeWinMasks();
+std::vector<uint16_t> computeTorusWinMasks()
+{
+    std::vector<uint16_t> winMasks;
+
+    FOR_CELLS(i)
+    {
+        uint16_t row = cellToRow(i);
+        uint16_t col = cellToCol(i);
+
+        {
+            uint16_t winMask = 0;
+            FOR_WIN_LEN(j)
+            {
+                setBit(winMask, rowColToCell(row, (col + j) % NUM_COLS));
+            }
+            winMasks.push_back(winMask);
+        }
+
+        {
+            uint16_t winMask = 0;
+            FOR_WIN_LEN(j)
+            {
+                setBit(winMask, rowColToCell((row + j) % NUM_ROWS, col));
+            }
+            winMasks.push_back(winMask);
+        }
+
+        {
+            uint16_t winMask = 0;
+            FOR_WIN_LEN(j)
+            {
+                setBit(winMask, rowColToCell((row + j) % NUM_ROWS, (col + j) % NUM_COLS));
+            }
+            winMasks.push_back(winMask);
+        }
+
+        {
+            uint16_t winMask = 0;
+            FOR_WIN_LEN(j)
+            {
+                setBit(winMask, rowColToCell((row + j) % NUM_ROWS, (NUM_COLS + col - j) % NUM_COLS));
+            }
+            winMasks.push_back(winMask);
+        }
+
+        {
+            uint16_t winMask = 0;
+            FOR_WIN_LEN(j)
+            {
+                setBit(winMask, rowColToCell((row + j / WIN_SQ_SIDE) % NUM_ROWS, (col + j % WIN_SQ_SIDE) % NUM_COLS));
+            }
+            winMasks.push_back(winMask);
+        }
+    }
+
+    return winMasks;
+}
+
+const std::vector<uint16_t> winMasks = computeTorusWinMasks();
 
 std::array<std::vector<uint16_t>, NUM_CELLS> computeCellWinMasks()
 {
@@ -737,7 +806,7 @@ void recInitTransTable(State& state, uint16_t depth)
 
 void initTransTable()
 {
-    std::string fileName = "tt.dat";
+    std::string fileName = "torus.tt";
 
     std::ifstream inFile(fileName, std::ios::in | std::ios::binary);
 
@@ -874,6 +943,18 @@ void play()
         std::cout << player + 1 << std::endl;
         std::cout << std::endl;
 
+        if (state.isWon())
+        {
+            std::cout << "Win" << std::endl;
+            break;
+        }
+
+        if (state.isDone())
+        {
+            std::cout << "Draw" << std::endl;
+            break;
+        }
+
         std::cout << "Eval:" << std::endl;
         std::cout << evalToString(state, eval(state)) << std::endl;
         std::cout << std::endl;
@@ -889,21 +970,11 @@ void play()
         }
         std::cout << std::endl;
 
-        if (state.isWon())
-        {
-            std::cout << "Win" << std::endl;
-            break;
-        }
-
-        if (state.isDone())
-        {
-            std::cout << "Draw" << std::endl;
-            break;
-        }
-
         std::cout << "Piece:" << std::endl;
         std::string pieceStr;
-        std::cin >> pieceStr;
+        // std::cin >> pieceStr;
+        pieceStr = pieceToString(randElem(evalMoves(state)[0].second));
+        std::cout << pieceStr << std::endl;
         std::cerr << pieceStr << std::endl;
         std::cout << std::endl;
 
@@ -932,7 +1003,9 @@ void play()
 
         std::cout << "Cell:" << std::endl;
         std::string cellStr;
-        std::cin >> cellStr;
+        // std::cin >> cellStr;
+        cellStr = cellToString(randElem(evalMoves(state)[0].second));
+        std::cout << cellStr << std::endl;
         std::cerr << cellStr << std::endl;
         std::cout << std::endl;
 

@@ -1,0 +1,618 @@
+Board:
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+ao bo ax bx Ao Bo Ax Bx aO bO aX bX AO BO AX BX : Draw
+
+Piece:
+bo
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+a1 b1 c1 d1 a2 b2 c2 d2 a3 b3 c3 d3 a4 b4 c4 d4 : Draw
+
+Cell:
+a3
+
+Board:
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+| bo |    |    |    |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+ao ax bx Ao Bo Ax Bx aO bO aX bX AO BO AX BX : Draw
+
+Piece:
+aO
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+a1 b1 c1 d1 a2 b2 c2 d2 b3 c3 d3 a4 b4 c4 d4 : Draw
+
+Cell:
+c1
+
+Board:
++----+----+----+----+
+|    |    | aO |    |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+| bo |    |    |    |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+ao ax bx Ao Bo Ax Bx bO aX bX AO BO AX BX : Draw
+
+Piece:
+BO
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+a1 b1 d1 a2 b2 c2 d2 b3 c3 d3 a4 b4 c4 d4 : Draw
+
+Cell:
+a1
+
+Board:
++----+----+----+----+
+| BO |    | aO |    |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+| bo |    |    |    |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+ao ax bx Ao Bo Ax Bx bO aX bX AO AX BX : Draw
+
+Piece:
+ao
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+d1 b2 c2 d2 b3 c3 d3 a4 b4 c4 d4 : Draw
+b1 a2 : Loss in 12
+
+Cell:
+c3
+
+Board:
++----+----+----+----+
+| BO |    | aO |    |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+| bo |    | ao |    |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+ax Ao Bo Ax Bx bO bX AO AX BX : Draw
+bx aX : Loss in 11
+
+Piece:
+Ao
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+b1 d1 a2 b2 d2 d3 a4 b4 c4 d4 : Draw
+c2 b3 : Loss in 12
+
+Cell:
+d1
+
+Board:
++----+----+----+----+
+| BO |    | aO | Ao |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+| bo |    | ao |    |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+ax bx Ax Bx aX bX AX BX : Draw
+Bo bO AO : Loss in 1
+
+Piece:
+ax
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+b1 a2 b2 c2 a4 b4 d4 : Draw
+d2 : Loss in 10
+b3 d3 c4 : Loss in 6
+
+Cell:
+b4
+
+Board:
++----+----+----+----+
+| BO |    | aO | Ao |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+| bo |    | ao |    |
++----+----+----+----+
+|    | ax |    |    |
++----+----+----+----+
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+bX : Draw
+bx Bx : Loss in 9
+Ax aX AX : Loss in 7
+BX : Loss in 5
+Bo bO AO : Loss in 1
+
+Piece:
+bX
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+b2 c2 d2 d3 d4 : Draw
+b1 : Loss in 8
+b3 c4 : Loss in 6
+a2 a4 : Loss in 4
+
+Cell:
+d3
+
+Board:
++----+----+----+----+
+| BO |    | aO | Ao |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+| bo |    | ao | bX |
++----+----+----+----+
+|    | ax |    |    |
++----+----+----+----+
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+Bx : Draw
+BX : Loss in 7
+Ax AX : Loss in 5
+bx Bo bO aX AO : Loss in 1
+
+Piece:
+Bx
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+b1 : Draw
+c2 d2 d4 : Loss in 8
+a2 b2 b3 a4 c4 : Loss in 4
+
+Cell:
+b1
+
+Board:
++----+----+----+----+
+| BO | Bx | aO | Ao |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+| bo |    | ao | bX |
++----+----+----+----+
+|    | ax |    |    |
++----+----+----+----+
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+BX : Draw
+Bo Ax AO AX : Loss in 3
+bx bO aX : Loss in 1
+
+Piece:
+BX
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+b3 c4 : Draw
+c2 : Loss in 8
+d2 a4 d4 : Loss in 4
+a2 b2 : Loss in 2
+
+Cell:
+c4
+
+Board:
++----+----+----+----+
+| BO | Bx | aO | Ao |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+| bo |    | ao | bX |
++----+----+----+----+
+|    | ax | BX |    |
++----+----+----+----+
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+AO : Draw
+AX : Loss in 5
+Bo Ax : Loss in 3
+bx bO aX : Loss in 1
+
+Piece:
+AO
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+b3 : Draw
+a4 d4 : Loss in 4
+a2 b2 c2 d2 : Loss in 2
+
+Cell:
+b3
+
+Board:
++----+----+----+----+
+| BO | Bx | aO | Ao |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+| bo | AO | ao | bX |
++----+----+----+----+
+|    | ax | BX |    |
++----+----+----+----+
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+Ax AX : Draw
+bx Bo bO aX : Loss in 3
+
+Piece:
+AX
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+a2 d2 a4 d4 : Draw
+b2 c2 : Loss in 4
+
+Cell:
+a4
+
+Board:
++----+----+----+----+
+| BO | Bx | aO | Ao |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+| bo | AO | ao | bX |
++----+----+----+----+
+| AX | ax | BX |    |
++----+----+----+----+
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+bO : Draw
+bx Bo Ax aX : Loss in 1
+
+Piece:
+bO
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+d4 : Draw
+a2 b2 c2 d2 : Loss in 2
+
+Cell:
+d4
+
+Board:
++----+----+----+----+
+| BO | Bx | aO | Ao |
++----+----+----+----+
+|    |    |    |    |
++----+----+----+----+
+| bo | AO | ao | bX |
++----+----+----+----+
+| AX | ax | BX | bO |
++----+----+----+----+
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+bx : Draw
+Bo Ax aX : Loss in 1
+
+Piece:
+bx
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+c2 : Draw
+a2 b2 d2 : Loss in 2
+
+Cell:
+c2
+
+Board:
++----+----+----+----+
+| BO | Bx | aO | Ao |
++----+----+----+----+
+|    |    | bx |    |
++----+----+----+----+
+| bo | AO | ao | bX |
++----+----+----+----+
+| AX | ax | BX | bO |
++----+----+----+----+
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+Ax : Draw
+Bo aX : Loss in 1
+
+Piece:
+Ax
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+d2 : Draw
+a2 b2 : Loss in 2
+
+Cell:
+d2
+
+Board:
++----+----+----+----+
+| BO | Bx | aO | Ao |
++----+----+----+----+
+|    |    | bx | Ax |
++----+----+----+----+
+| bo | AO | ao | bX |
++----+----+----+----+
+| AX | ax | BX | bO |
++----+----+----+----+
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+aX : Draw
+Bo : Loss in 1
+
+Piece:
+aX
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+b2 : Draw
+a2 : Loss in 2
+
+Cell:
+b2
+
+Board:
++----+----+----+----+
+| BO | Bx | aO | Ao |
++----+----+----+----+
+|    | aX | bx | Ax |
++----+----+----+----+
+| bo | AO | ao | bX |
++----+----+----+----+
+| AX | ax | BX | bO |
++----+----+----+----+
+
+Player:
+2
+
+Eval:
+Draw
+
+Moves:
+Bo : Draw
+
+Piece:
+Bo
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+a2 : Draw
+
+Cell:
+a2
+
+Board:
++----+----+----+----+
+| BO | Bx | aO | Ao |
++----+----+----+----+
+| Bo | aX | bx | Ax |
++----+----+----+----+
+| bo | AO | ao | bX |
++----+----+----+----+
+| AX | ax | BX | bO |
++----+----+----+----+
+
+Player:
+1
+
+Eval:
+Draw
+
+Moves:
+
+Draw
